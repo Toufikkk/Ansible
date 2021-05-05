@@ -1,0 +1,90 @@
+---
+## APACHE2 && PHP8.0.1
+- hosts: app_hosting
+
+  tasks:
+    - name: Install apache2
+      apt:
+        name:
+          - apache2
+          - php8.0.1
+        state: present   
+
+ 
+    ## Telechargement DOKUWIKI et Dezip
+  
+    - name: Download dokuwiki
+      get_url:
+        url: https://download.dokuwiki.org/src/dokuwiki/dokuwiki-stable.tgz
+        dest: /usr/src
+      when: not dokuwiki_directory.stat.exists or not dokuwiki_directory.stat.isdir
+
+    - name: Unzip dokuwiki
+      unarchive:
+        remote_src: yes 
+        src: /usr/src/dokuwiki-stable.tgz
+        dest: /usr/src
+      when: not dokuwiki_directory.stat.exists or not dokuwiki_directory.stat.isdir
+  
+    ## virtualhost
+ 
+    - name: Check if recettes.wiki virtualhost exists
+      stat:
+        path: /etc/apache2/sites-available/recettes-wiki.conf
+      register: recettes_wiki_vhost
+
+    - name: Check if politique.wiki virtualhost exists
+      stat:
+        path: /etc/apache2/sites-available/politique-wiki.conf
+      register: politique_wiki_vhost
+
+    - name: Copy recettes.wiki virtualhost
+      copy:
+        src: files/recettes-wiki.conf
+        dest: /etc/apache2/sites-available/recettes-wiki.conf
+      when: not recettes_wiki_vhost.stat.exists
+
+    - name: Copy politique.wiki virtualhost
+      copy:
+        src: files/politique-wiki.conf
+        dest: /etc/apache2/sites-available/politique-wiki.conf
+      when: not politique_wiki_vhost.stat.exists
+    
+
+    ## Les permissions 
+    
+    - name: Copy dokuwiki to /var/www/recettes_wiki
+      command: cp -r /usr/src/dokuwiki /var/www/recettes_wiki
+      when: not recettes_wiki_directory.stat.exists
+
+    - name: Copy dokuwiki to /var/www/politique_wiki
+      command: cp -r /usr/src/dokuwiki /var/www/politique_wiki
+      when: not politique_wiki_directory.stat.exists
+    
+    - name: Change permissions of /var/www/recettes_wiki
+      file:
+        path: /var/www/recettes_wiki
+        state: directory
+        recurse: yes
+        owner: www-data
+        group: www-data
+      when: not recettes_wiki_directory.stat.exists
+    
+    - name: Change permissions of /var/www/politique_wiki
+      file:
+        path: /var/www/politique_wiki
+        state: directory
+        recurse: yes
+        owner: www-data
+        group: www-data
+      when: not politique_wiki_directory.stat.exists
+
+    - name: Enable recettes.wiki
+      command: a2ensite recettes-wiki
+    
+    - name: Enable politique.wiki
+      command: a2ensite politique-wiki
+    
+    - name: Reload apache
+      command: systemctl reload apache2
+
